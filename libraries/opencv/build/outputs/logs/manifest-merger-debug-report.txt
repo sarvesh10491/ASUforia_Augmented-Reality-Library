@@ -1,37 +1,37 @@
 -- Merging decision tree log ---
 manifest
-ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:1-8:12
+ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:1-8:12
 	package
-		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:3:7-27
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
+		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:3:7-27
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
 	android:versionName
-		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:5:7-34
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
+		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:5:7-34
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
 	xmlns:android
-		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:2:11-69
+		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:2:11-69
 	android:versionCode
-		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml:4:7-33
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
+		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml:4:7-33
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
 uses-sdk
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml reason: use-sdk injection requested
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
 	android:targetSdkVersion
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
 	android:minSdkVersion
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
-		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\open_cv_test_eee508\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		ADDED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml
+		INJECTED from D:\ASU\Fall 2018\MSA\Assignment2\AR_test\libraries\opencv\AndroidManifest.xml

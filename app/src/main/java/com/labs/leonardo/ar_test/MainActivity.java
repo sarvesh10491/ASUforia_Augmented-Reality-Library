@@ -3,10 +3,13 @@ package com.labs.leonardo.ar_test;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraCaptureSession;
@@ -27,13 +30,14 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Size;
 import android.util.Log;
-import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
+
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -46,8 +50,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import static org.opencv.core.CvType.CV_8UC1;
 
-public class MainActivity extends AppCompatActivity {
+
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback{
 
     // Output files will be saved as /sdcard/Pictures/AR_test_*.jpg
     static final String CAPTURE_FILENAME_PREFIX = "AR_test_";
@@ -67,6 +73,10 @@ public class MainActivity extends AppCompatActivity {
     // View for displaying the camera preview.
     SurfaceView mSurfaceView;
 
+    Surface imgSurface;
+
+    SurfaceHolder holder,holderTransparent;
+
     // Used to retrieve the captured image when the user takes a snapshot.
     ImageReader mCaptureBuffer;
 
@@ -79,21 +89,16 @@ public class MainActivity extends AppCompatActivity {
     // Our image capture session.
     CameraCaptureSession mCaptureSession;
 
-    private SurfaceHolder surfaceHolder = null;
+    boolean mGotSecondCallback;
 
-    private Paint paint = null;
+    int  deviceHeight,deviceWidth;
+    private float RectLeft, RectTop,RectRight,RectBottom ;
 
-    private boolean drawBall = true;
-
-    private FrameLayout canvasLayout = null;
-
-    CustomSurfaceView customSurfaceView = null;
-    //    private float circleX = 0;
-//
-//    private float circleY = 0;
 
     private  static  final int REQUEST_CAMERA_PERMISSION = 200;
     Activity mainactivty=this;
+    private String mCameraId;
+    private Runnable runnable;
 
     /**
      * Given {@code choices} of {@code Size}s supported by a camera, chooses the smallest one whose
@@ -120,6 +125,150 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        super.onResume();
+        // Start a background thread to manage camera requests
+        mBackgroundThread = new HandlerThread("background");
+        mBackgroundThread.start();
+        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+        mForegroundHandler = new Handler(getMainLooper());
+        mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
+//        // Inflate the SurfaceView, set it as the main layout, and attach a listener
+        setContentView(R.layout.activity_main);
+        mSurfaceView = (SurfaceView) findViewById(R.id.mainSurfaceView);
+        mSurfaceView.getHolder().addCallback((SurfaceHolder.Callback) this);
+//        mSurfaceView.setSecure(true);
+        System.out.println("Here");
+//        setContentView(mSurfaceView);
+        // Control flow continues in mSurfaceHolderCallback.surfaceChanged()
+        //getting the device heigth and width
+
+        SurfaceView transparentView = (SurfaceView) findViewById(R.id.TransparetnView);
+        holderTransparent = transparentView.getHolder();
+        holderTransparent.setFormat(PixelFormat.TRANSPARENT);
+        holderTransparent.addCallback((SurfaceHolder.Callback) this);
+        transparentView.setZOrderMediaOverlay(true);
+
+        deviceWidth=getScreenWidth();
+        deviceHeight=getScreenHeight();
+    }
+
+    private void getFrame() {
+        System.out.println("Starting thread");
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        System.out.println("Running thread");
+                        frame_refresh( holder,  deviceWidth,  deviceHeight);
+                    }
+                });
+            }
+        });
+
+        thread.start();
+        System.out.println("Done creating thread");
+    }
+    @Override
+    public void surfaceCreated( SurfaceHolder holder) {
+        Log.i(TAG, "------------------Surface created----------------");
+        System.out.println("1. Surface created");
+        mCameraId = null;
+        mGotSecondCallback = false;
+//        Thread thread = new Thread(runnable);
+//        thread.run();
+        getFrame();
+        Draw();
+        System.out.println("2. Surface created");
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        //frame_refresh( holder,  width,  height);
+        //System.out.println("%%%%%%%%%%%%       Running in surface change");
+    }
+
+    private void frame_refresh(SurfaceHolder holder, int width, int height) {
+        // On the first invocation, width and height were automatically set to the view's size
+        if (mCameraId == null) {
+            // Find the device's back-facing camera and set the destination buffer sizes
+            try {
+                for (String cameraId : mCameraManager.getCameraIdList()) {
+                    CameraCharacteristics cameraCharacteristics =
+                            mCameraManager.getCameraCharacteristics(cameraId);
+                    if (cameraCharacteristics.get(cameraCharacteristics.LENS_FACING) ==
+                            CameraCharacteristics.LENS_FACING_BACK) {
+                        Log.i(TAG, "Found a back-facing camera");
+                        StreamConfigurationMap info = cameraCharacteristics
+                                .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                        // Bigger is better when it comes to saving our image
+                        Size largestSize = Collections.max(
+                                Arrays.asList(info.getOutputSizes(ImageFormat.JPEG)),
+                                new CompareSizesByArea());
+                        // Prepare an ImageReader in case the user wants to capture images
+                        Log.i(TAG, "Capture size: " + largestSize);
+                        mCaptureBuffer = ImageReader.newInstance(largestSize.getWidth(),
+                                largestSize.getHeight(), ImageFormat.JPEG, /*maxImages*/2);
+                        imgSurface = mCaptureBuffer.getSurface();
+
+                        mCaptureBuffer.setOnImageAvailableListener(
+                                mImageCaptureListener, mBackgroundHandler);
+                        // Danger, W.R.! Attempting to use too large a preview size could
+                        // exceed the camera bus' bandwidth limitation, resulting in
+                        // gorgeous previews but the storage of garbage capture data.
+                        Log.i(TAG, "SurfaceView size: " +
+                                mSurfaceView.getWidth() + 'x' + mSurfaceView.getHeight());
+                        Size optimalSize = chooseBigEnoughSize(
+                                info.getOutputSizes(SurfaceHolder.class), width, height);
+                        // Set the SurfaceHolder to use the camera's largest supported size
+                        Log.i(TAG, "Preview size: " + optimalSize);
+                        SurfaceHolder surfaceHolder = mSurfaceView.getHolder();
+                        surfaceHolder.setFixedSize(optimalSize.getWidth(),
+                                optimalSize.getHeight());
+                        mCameraId = cameraId;
+                        return;
+                        // Control flow continues with this method one more time
+                        // (since we just changed our own size)
+                    }
+                }
+            } catch (CameraAccessException ex) {
+                Log.e(TAG, "Unable to list cameras", ex);
+            }
+            Log.e(TAG, "Didn't find any back-facing cameras");
+            // This is the second time the method is being invoked: our size change is complete
+        } else if (!mGotSecondCallback) {
+            if (mCamera != null) {
+                Log.e(TAG, "Aborting camera open because it hadn't been closed");
+                return;
+            }
+            // Open the camera device
+            try {
+                if(ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+                {
+                    ActivityCompat.requestPermissions(mainactivty, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
+                    return;
+                }
+                mCameraManager.openCamera(mCameraId, mCameraStateCallback,
+                        mBackgroundHandler);
+            } catch (CameraAccessException ex) {
+                Log.e(TAG, "Failed to configure output surface", ex);
+            }
+            mGotSecondCallback = true;
+            // Control flow continues in mCameraStateCallback.onOpened()
+        }
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.i(TAG, "Surface destroyed");
+        holder.removeCallback(this);
+    }
+
     /**
      * Compares two {@code Size}s based on their areas.
      */
@@ -133,35 +282,73 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    public static int getScreenWidth() {
+
+        return Resources.getSystem().getDisplayMetrics().widthPixels;
+
+    }
+
+
+
+    public static int getScreenHeight() {
+
+        return Resources.getSystem().getDisplayMetrics().heightPixels;
+
+    }
+
+    private void Draw()
+
+    {
+
+        Canvas canvas = holderTransparent.lockCanvas(null);
+
+        Paint  paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        paint.setStyle(Paint.Style.STROKE);
+
+        paint.setColor(Color.GREEN);
+
+        paint.setStrokeWidth(3);
+
+        RectLeft = 1;
+
+        RectTop = 200 ;
+
+        RectRight = RectLeft+ deviceWidth-100;
+
+        RectBottom =RectTop+ 200;
+
+        Rect rec=new Rect((int) RectLeft,(int)RectTop,(int)RectRight,(int)RectBottom);
+
+        canvas.drawRect(rec,paint);
+
+        holderTransparent.unlockCanvasAndPost(canvas);
+
+
+
+    }
+
+
+
+
     /**
      * Called when our {@code Activity} gains focus. <p>Starts initializing the camera.</p>
      */
     @Override
     protected void onResume() {
         super.onResume();
-        if(canvasLayout == null)
-        {
-            canvasLayout = (FrameLayout)findViewById(R.id.customViewLayout);
-        }
         // Start a background thread to manage camera requests
-        mBackgroundThread = new HandlerThread("background");
-        mBackgroundThread.start();
-        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
-        mForegroundHandler = new Handler(getMainLooper());
-        mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
-        // Inflate the SurfaceView, set it as the main layout, and attach a listener
-        View layout = getLayoutInflater().inflate(R.layout.activity_main, null);
-        mSurfaceView = (SurfaceView) layout.findViewById(R.id.mainSurfaceView);
-        mSurfaceView.getHolder().addCallback(mSurfaceHolderCallback);
-        setContentView(mSurfaceView);
-
-//        if(paint == null)
-//        {
-//            paint = new Paint();
-//
-//            paint.setColor(Color.RED);
-//        }
-        // Control flow continues in mSurfaceHolderCallback.surfaceChanged()
+//        mBackgroundThread = new HandlerThread("background");
+//        mBackgroundThread.start();
+//        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+//        mForegroundHandler = new Handler(getMainLooper());
+//        mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
+//        // Inflate the SurfaceView, set it as the main layout, and attach a listener
+//        View layout = getLayoutInflater().inflate(R.layout.activity_main, null);
+//        mSurfaceView = (SurfaceView) layout.findViewById(R.id.mainSurfaceView);
+//        mSurfaceView.getHolder().addCallback(mSurfaceHolderCallback);
+//        setContentView(mSurfaceView);
+//        // Control flow continues in mSurfaceHolderCallback.surfaceChanged()
     }
 
     /**
@@ -200,215 +387,129 @@ public class MainActivity extends AppCompatActivity {
      * as defined in the {@code mainactivity.xml} layout file. <p>Captures a full-resolution image
      * and saves it to permanent storage.</p>
      */
-    public void onClickOnSurfaceView(View v) {
-        if (mCaptureSession != null) {
-            try {
-                CaptureRequest.Builder requester =
-                        mCamera.createCaptureRequest(mCamera.TEMPLATE_STILL_CAPTURE);
-                requester.addTarget(mCaptureBuffer.getSurface());
-                try {
-                    // This handler can be null because we aren't actually attaching any callback
-                    mCaptureSession.capture(requester.build(), /*listener*/null, /*handler*/null);
-                } catch (CameraAccessException ex) {
-                    Log.e(TAG, "Failed to file actual capture request", ex);
-                }
-            } catch (CameraAccessException ex) {
-                Log.e(TAG, "Failed to build actual capture request", ex);
-            }
-        } else {
-            Log.e(TAG, "User attempted to perform a capture outside our session");
-        }
-        // Control flow continues in mImageCaptureListener.onImageAvailable()
-    }
+//    public void onClickOnSurfaceView(View v) {
+//        if (mCaptureSession != null) {
+//            try {
+//                CaptureRequest.Builder requester =
+//                        mCamera.createCaptureRequest(mCamera.TEMPLATE_STILL_CAPTURE);
+//                requester.addTarget(mCaptureBuffer.getSurface());
+//                try {
+//                    // This handler can be null because we aren't actually attaching any callback
+//                    mCaptureSession.capture(requester.build(), /*listener*/null, /*handler*/null);
+//                } catch (CameraAccessException ex) {
+//                    Log.e(TAG, "Failed to file actual capture request", ex);
+//                }
+//            } catch (CameraAccessException ex) {
+//                Log.e(TAG, "Failed to build actual capture request", ex);
+//            }
+//        } else {
+//            Log.e(TAG, "User attempted to perform a capture outside our session");
+//        }
+//        // Control flow continues in mImageCaptureListener.onImageAvailable()
+//    }
 
     /**
      * Callbacks invoked upon state changes in our {@code SurfaceView}.
      */
-    final SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
-        public float circleX;
-        public float circleY;
-        /** The camera device to use, or null if we haven't yet set a fixed surface size. */
-        private String mCameraId;
-        /** Whether we received a change callback after setting our fixed surface size. */
-        private boolean mGotSecondCallback;
+//    final SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
+//        /** The camera device to use, or null if we haven't yet set a fixed surface size. */
+//        private String mCameraId;
+//        /** Whether we received a change callback after setting our fixed surface size. */
+//        private boolean mGotSecondCallback;
 
-        @Override
-        public void surfaceCreated(SurfaceHolder holder) {
-            // This is called every time the surface returns to the foreground
-            Log.i(TAG, "Surface created");
-            mCameraId = null;
-            mGotSecondCallback = false;
-
-            CustomSurfaceView customSurfaceView = new CustomSurfaceView(getApplicationContext());
-
-            canvasLayout.addView(customSurfaceView);
-
-
-
-            //            drawBall();
-            // SampleCanvasActivity drawView = new SampleCanvasActivity(getApplicationContext());
-
-            // drawView.setBackgroundColor(Color.WHITE);
-            // setContentView(drawView);
-        }
-
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-
-            // If user touch the custom SurfaceView object.
-            if(view instanceof SurfaceView) {
-
-                float x = motionEvent.getX();
-
-                float y = motionEvent.getY();
-
-                customSurfaceView.setCircleX(x);
-
-                customSurfaceView.setCircleY(y);
-
-                if (drawBall) {
-                    // Create and set a red paint to custom surfaceview.
-                    Paint paint = new Paint();
-                    paint.setColor(Color.RED);
-                    customSurfaceView.setPaint(paint);
-
-                    customSurfaceView.drawBall();
-                } else {
-                    // Create and set a green paint to custom surfaceview.
-                    Paint paint = new Paint();
-                    paint.setColor(Color.GREEN);
-                    customSurfaceView.setPaint(paint);
-
-                    customSurfaceView.drawRect();
-                }
-
-                // Tell android os the onTouch event has been processed.
-                return true;
-            }else
-            {
-                // Tell android os the onTouch event has not been processed.
-                return false;
-            }
-        }
-
-//        public void drawBall()
-//        {
-//            // Get and lock canvas object from surfaceHolder.
-//            Canvas canvas = surfaceHolder.lockCanvas();
+//        SurfaceHolder holderTransparent;
 //
-//            Paint surfaceBackground = new Paint();
-//            // Set the surfaceview background color.
-//            surfaceBackground.setColor(Color.CYAN);
-//            // Draw the surfaceview background color.
-//            canvas.drawRect(0, 0, mSurfaceView.getWidth(), mSurfaceView.getHeight(), surfaceBackground);
+//        private float RectLeft, RectTop,RectRight,RectBottom ;
 //
-//            // Draw the circle.
-//            canvas.drawCircle(circleX, circleY, 100, paint);
-//
-//            // Unlock the canvas object and post the new draw.
-//            surfaceHolder.unlockCanvasAndPost(canvas);
-//        }
-        /* This method will be invoked to draw a circle in canvas. */
+//        int  deviceHeight,deviceWidth;
 
-//        public float getCircleX() {
-//            return circleX;
-//        }
+//        @Override
+//        public void surfaceCreated(SurfaceHolder holder) {
+//            // This is called every time the surface returns to the foreground
+////            Log.i(TAG, "Surface created");
+////            mCameraId = null;
+////            mGotSecondCallback = false;
+////            Draw();
 //
-//        public void setCircleX(float circleX) {
-//            this.circleX = circleX;
-//        }
-//
-//        public float getCircleY() {
-//            return circleY;
-//        }
-//
-//        public void setCircleY(float circleY) {
-//            this.circleY = circleY;
-//        }
-//
-//        public Paint getPaint() {
-//            return paint;
-//        }
-//
-//        public void setPaint(Paint paint) {
-//
-//            this.paint = paint;
+////            drawView.setBackgroundColor(Color.WHITE);
+//            //setContentView(drawView);
 //        }
 
-        @Override
-        public void surfaceDestroyed(SurfaceHolder holder) {
-            Log.i(TAG, "Surface destroyed");
-            holder.removeCallback(this);
-            // We don't stop receiving callbacks forever because onResume() will reattach us
-        }
+//        @Override
+//        public void surfaceDestroyed(SurfaceHolder holder) {
+//            Log.i(TAG, "Surface destroyed");
+//            holder.removeCallback(this);
+//            // We don't stop receiving callbacks forever because onResume() will reattach us
+//        }
 
-        @Override
-        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            // On the first invocation, width and height were automatically set to the view's size
-            if (mCameraId == null) {
-                // Find the device's back-facing camera and set the destination buffer sizes
-                try {
-                    for (String cameraId : mCameraManager.getCameraIdList()) {
-                        CameraCharacteristics cameraCharacteristics =
-                                mCameraManager.getCameraCharacteristics(cameraId);
-                        if (cameraCharacteristics.get(cameraCharacteristics.LENS_FACING) ==
-                                CameraCharacteristics.LENS_FACING_BACK) {
-                            Log.i(TAG, "Found a back-facing camera");
-                            StreamConfigurationMap info = cameraCharacteristics
-                                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                            // Bigger is better when it comes to saving our image
-                            Size largestSize = Collections.max(
-                                    Arrays.asList(info.getOutputSizes(ImageFormat.JPEG)),
-                                    new CompareSizesByArea());
-                            // Prepare an ImageReader in case the user wants to capture images
-                            Log.i(TAG, "Capture size: " + largestSize);
-                            mCaptureBuffer = ImageReader.newInstance(largestSize.getWidth(),
-                                    largestSize.getHeight(), ImageFormat.JPEG, /*maxImages*/2);
-                            mCaptureBuffer.setOnImageAvailableListener(
-                                    mImageCaptureListener, mBackgroundHandler);
-                            // Danger, W.R.! Attempting to use too large a preview size could
-                            // exceed the camera bus' bandwidth limitation, resulting in
-                            // gorgeous previews but the storage of garbage capture data.
-                            Log.i(TAG, "SurfaceView size: " +
-                                    mSurfaceView.getWidth() + 'x' + mSurfaceView.getHeight());
-                            Size optimalSize = chooseBigEnoughSize(
-                                    info.getOutputSizes(SurfaceHolder.class), width, height);
-                            // Set the SurfaceHolder to use the camera's largest supported size
-                            Log.i(TAG, "Preview size: " + optimalSize);
-                            SurfaceHolder surfaceHolder = mSurfaceView.getHolder();
-                            surfaceHolder.setFixedSize(optimalSize.getWidth(),
-                                    optimalSize.getHeight());
-                            mCameraId = cameraId;
-                            return;
-                            // Control flow continues with this method one more time
-                            // (since we just changed our own size)
-                        }
-                    }
-                } catch (CameraAccessException ex) {
-                    Log.e(TAG, "Unable to list cameras", ex);
-                }
-                Log.e(TAG, "Didn't find any back-facing cameras");
-                // This is the second time the method is being invoked: our size change is complete
-            } else if (!mGotSecondCallback) {
-                if (mCamera != null) {
-                    Log.e(TAG, "Aborting camera open because it hadn't been closed");
-                    return;
-                }
-                // Open the camera device
-                try {
-                    if(ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
-                    {
-                        ActivityCompat.requestPermissions(mainactivty, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
-                        return;
-                    }
-                    mCameraManager.openCamera(mCameraId, mCameraStateCallback,
-                            mBackgroundHandler);
-                } catch (CameraAccessException ex) {
-                    Log.e(TAG, "Failed to configure output surface", ex);
-                }
-                mGotSecondCallback = true;
-                // Control flow continues in mCameraStateCallback.onOpened()
-            }
-        }};
+//        @Override
+//        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+//            // On the first invocation, width and height were automatically set to the view's size
+//            if (mCameraId == null) {
+//                // Find the device's back-facing camera and set the destination buffer sizes
+//                try {
+//                    for (String cameraId : mCameraManager.getCameraIdList()) {
+//                        CameraCharacteristics cameraCharacteristics =
+//                                mCameraManager.getCameraCharacteristics(cameraId);
+//                        if (cameraCharacteristics.get(cameraCharacteristics.LENS_FACING) ==
+//                                CameraCharacteristics.LENS_FACING_BACK) {
+//                            Log.i(TAG, "Found a back-facing camera");
+//                            StreamConfigurationMap info = cameraCharacteristics
+//                                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+//                            // Bigger is better when it comes to saving our image
+//                            Size largestSize = Collections.max(
+//                                    Arrays.asList(info.getOutputSizes(ImageFormat.JPEG)),
+//                                    new CompareSizesByArea());
+//                            // Prepare an ImageReader in case the user wants to capture images
+//                            Log.i(TAG, "Capture size: " + largestSize);
+//                            mCaptureBuffer = ImageReader.newInstance(largestSize.getWidth(),
+//                                    largestSize.getHeight(), ImageFormat.JPEG, /*maxImages*/2);
+//                            mCaptureBuffer.setOnImageAvailableListener(
+//                                    mImageCaptureListener, mBackgroundHandler);
+//                            // Danger, W.R.! Attempting to use too large a preview size could
+//                            // exceed the camera bus' bandwidth limitation, resulting in
+//                            // gorgeous previews but the storage of garbage capture data.
+//                            Log.i(TAG, "SurfaceView size: " +
+//                                    mSurfaceView.getWidth() + 'x' + mSurfaceView.getHeight());
+//                            Size optimalSize = chooseBigEnoughSize(
+//                                    info.getOutputSizes(SurfaceHolder.class), width, height);
+//                            // Set the SurfaceHolder to use the camera's largest supported size
+//                            Log.i(TAG, "Preview size: " + optimalSize);
+//                            SurfaceHolder surfaceHolder = mSurfaceView.getHolder();
+//                            surfaceHolder.setFixedSize(optimalSize.getWidth(),
+//                                    optimalSize.getHeight());
+//                            mCameraId = cameraId;
+//                            return;
+//                            // Control flow continues with this method one more time
+//                            // (since we just changed our own size)
+//                        }
+//                    }
+//                } catch (CameraAccessException ex) {
+//                    Log.e(TAG, "Unable to list cameras", ex);
+//                }
+//                Log.e(TAG, "Didn't find any back-facing cameras");
+//                // This is the second time the method is being invoked: our size change is complete
+//            } else if (!mGotSecondCallback) {
+//                if (mCamera != null) {
+//                    Log.e(TAG, "Aborting camera open because it hadn't been closed");
+//                    return;
+//                }
+//                // Open the camera device
+//                try {
+//                    if(ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+//                    {
+//                        ActivityCompat.requestPermissions(mainactivty, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
+//                        return;
+//                    }
+//                    mCameraManager.openCamera(mCameraId, mCameraStateCallback,
+//                            mBackgroundHandler);
+//                } catch (CameraAccessException ex) {
+//                    Log.e(TAG, "Failed to configure output surface", ex);
+//                }
+//                mGotSecondCallback = true;
+//                // Control flow continues in mCameraStateCallback.onOpened()
+//            }
+//        }};
     /**
      * Calledbacks invoked upon state changes in our {@code CameraDevice}. <p>These are run on
      * {@code mBackgroundThread}.</p>
@@ -486,8 +587,51 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onImageAvailable(ImageReader reader) {
                     // Save the image once we get a chance
-                    mBackgroundHandler.post(new CapturedImageSaver(reader.acquireNextImage()));
+                    //mBackgroundHandler.post(new CapturedImageSaver(reader.acquireNextImage()));
                     // Control flow continues in CapturedImageSaver#run()
+                    Image capture = reader.acquireNextImage();
+                    System.out.println("**************** Captured Image ***************************");
+                    Mat yuvMat = new Mat(capture.getHeight() + capture.getHeight() / 2, capture.getWidth(), CV_8UC1);
+                    Mat rgbMat = new Mat(capture.getHeight(), capture.getHeight(), CvType.CV_8UC3);
+
+                    ByteBuffer Y = capture.getPlanes()[0].getBuffer();
+                    ByteBuffer U = capture.getPlanes()[1].getBuffer();
+                    ByteBuffer V = capture.getPlanes()[2].getBuffer();
+
+                    int Yb = Y.remaining();
+                    int Ub = U.remaining();
+                    int Vb = V.remaining();
+                    System.out.println("Captured image size: " + capture.getWidth() + 'x' + capture.getHeight());
+                    // Write the image out to the chosen file
+//                    byte[] jpeg = new byte[buffer.remaining()];
+//                    buffer.get(jpeg);
+//                    ostream.write(jpeg);
+                    byte[] data = new byte[Yb + Ub + Vb ];
+
+                    Y.get(data, 0, Yb);
+                    U.get(data, Yb, Ub);
+                    V.get(data, Yb+ Ub, Vb);
+
+                    System.out.println("RGB Mat data before"+rgbMat);
+                    System.out.println("YUV Mat data before"+yuvMat);
+                    yuvMat.put(0, 0, data);
+                    System.out.println("sssssssssssssssssssssssssssssss");
+                    Imgproc.cvtColor(yuvMat, rgbMat, Imgproc.COLOR_YUV420p2RGBA, 3);
+
+                    yuvMat.release();
+//                    mat1 = Imgcodecs.imdecode(new MatOfByte(data), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+//                    String dump = rgbMat.dump();
+                    Log.i(TAG,"-------------------------------------------");
+                    System.out.println("RGB Mat data after"+rgbMat);
+                    System.out.println("YUV Mat data after"+yuvMat);
+                    //                    System.out.println(rgbMat);
+//                    Log.d(TAG, dump);
+                    Log.i(TAG,"-------------------------------------------");
+//                    rgbMat.release();
+//                    foriatry = new ASUforia(rgbMat);
+
+//                    foriatry.startImageProcesing(ivBlurImage1);
+//
                 }};
     /**
      * Deferred processor responsible for saving snapshots to disk. <p>This is run on
