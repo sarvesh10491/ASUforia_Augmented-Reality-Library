@@ -1,23 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--<SurfaceView xmlns:android="http://schemas.android.com/apk/res/android"-->
-    <!--android:id="@+id/mainSurfaceView"-->
-    <!--android:layout_height="fill_parent"-->
-    <!--android:layout_width="fill_parent"-->
-    <!--android:onClick="onClickOnSurfaceView" >-->
-<!--</SurfaceView>-->
-
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/mainSurfaceView"
-    android:layout_height="fill_parent"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="fill_parent"
-    android:onClick="onClickOnSurfaceView" >
+    android:layout_height="fill_parent" >
+<SurfaceView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainSurfaceView"
+    android:layout_width="400dp"
+    android:layout_height="300dp"
+    android:onClick="onClickOnSurfaceView" />
+
+<ImageView
+android:id="@+id/iv_blur_image"
+android:layout_width="400dp"
+android:layout_height="300dp"
+android:layout_alignParentEnd="true"
+android:layout_centerVertical="true"
+android:layout_marginEnd="31dp"
+android:src="@drawable/lena"
+    android:layout_toLeftOf="@+id/mainSurfaceView"
+android:scaleType="fitXY" />
+
+<!--<ImageView-->
+    <!--android:id="@+id/ref_blur_image"-->
+    <!--android:layout_width="400dp"-->
+    <!--android:layout_height="300dp"-->
+    <!--android:layout_toLeftOf="@+id/iv_blur_image"-->
+    <!--android:layout_marginEnd="31dp"-->
+    <!--android:src="@drawable/lena"-->
+    <!--android:scaleType="fitXY" />-->
 
 
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        android:id="@+id/customViewLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
-</FrameLayout>
-
-</FrameLayout>
+</RelativeLayout>
