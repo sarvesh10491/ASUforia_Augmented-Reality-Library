@@ -1,3 +1,14 @@
+/*
+
+ASUforia.java - AR library to
+
+
+Main Activity : We implemented default android callbacks such as OnCreate(), OnResume(), On Pause(), OnDestroy() and our ASUforia framework's callback which is OnPose(). In MainActivity we are calling ASUforia constructor as mwntioned in the assignment requirement.
+We have called the startEstimation() method in the OnResume() that starts the Camera Stream and sends the YUV420_888 format image to the OnImageListener defined in the ASUforia library.
+We implemented the endEstimation() in the OnPause() callback to end the camera feed and start it again in by calling startEstimation() in onResume()
+ */
+
+
 package com.labs.leonardo.ar_test;
 
 import android.Manifest;
@@ -5,6 +16,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
@@ -44,6 +57,7 @@ import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -57,7 +71,7 @@ import java.util.List;
 import static org.opencv.core.CvType.CV_8UC1;
 
 
-public class MainActivity extends AppCompatActivity{
+public class MainActivity extends AppCompatActivity implements ASUforia.PoseListner{
 
     // Output files will be saved as /sdcard/Pictures/AR_test_*.jpg
     static final String CAPTURE_FILENAME_PREFIX = "AR_test_";
@@ -79,6 +93,8 @@ public class MainActivity extends AppCompatActivity{
 
     Surface imgSurface;
 
+    // Reference Image Bitmap
+    Bitmap ref_img;
     private Activity mActivity;
 
     SurfaceHolder holder,holderTransparent;
@@ -108,14 +124,7 @@ public class MainActivity extends AppCompatActivity{
     private String mCameraId;
     private Runnable runnable;
 
-    /**
-     * Given {@code choices} of {@code Size}s supported by a camera, chooses the smallest one whose
-     * width and height are at least as large as the respective requested values.
-     * @param choices The list of sizes that the camera supports for the intended output class
-     * @param width The minimum desired width
-     * @param height The minimum desired height
-     * @return The optimal {@code Size}, or an arbitrary one if none were big enough
-     */
+
     static Size chooseBigEnoughSize(Size[] choices, int width, int height) {
         // Collect the supported resolutions that are at least as big as the preview Surface
         List<Size> bigEnough = new ArrayList<Size>();
@@ -132,40 +141,16 @@ public class MainActivity extends AppCompatActivity{
             return choices[0];
         }
     }
-
-    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
-        @Override
-        public void onManagerConnected(int status) {
-
-            switch (status) {
-                case LoaderCallbackInterface.SUCCESS: {
-//                    ivBlurImage = (ImageView) findViewById(R.id.iv_blur_image);
-                    Log.i("OpenCV", "OpenCV loaded successfully");
-                }
-                break;
-                default: {
-                    super.onManagerConnected(status);
-                }
-                break;
-            }
-        }
-    };
-
+    /*
+     Paint a user interface surface with the camera image with a cube as an overlay
+    on the marker in the image.
+     Sets up OpenCV to paint the image with Java code.
+    o Create an Asuforia object
+      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         super.onResume();
-        // Start a background thread to manage camera requests
-//        mBackgroundThread = new HandlerThread("background");
-//        mBackgroundThread.start();
-//        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
-//        mForegroundHandler = new Handler(getMainLooper());
-
-//        mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
-////        // Inflate the SurfaceView, set it as the main layout, and attach a listener
-//        setContentView(R.layout.activity_main);
-//        mSurfaceView = (SurfaceView) findViewById(R.id.mainSurfaceView);
-//        mSurfaceView.getHolder().addCallback((SurfaceHolder.Callback) this);
 
 
         if (!OpenCVLoader.initDebug()) {
@@ -176,159 +161,48 @@ public class MainActivity extends AppCompatActivity{
 
 //        mSurfaceView.setSecure(true);
         System.out.println("In On Create");
-//        setContentView(mSurfaceView);
-        // Control flow continues in mSurfaceHolderCallback.surfaceChanged()
-        //getting the device heigth and width
 
-//         transparentView = (SurfaceView) findViewById(R.id.TransparetnView);
-//        holderTransparent = transparentView.getHolder();
-//        holderTransparent.setFormat(PixelFormat.TRANSPARENT);
-//        holderTransparent.addCallback((SurfaceHolder.Callback) this);
-//        transparentView.setZOrderMediaOverlay(true);
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        try {
+            ref_img = BitmapFactory.decodeResource(getApplicationContext().getResources(), R.drawable.lena, options);
+            System.out.println("Ref Img height"+ref_img.getHeight()+" Width is:"+ref_img.getWidth());
+        } catch (Exception e){
+
+            e.printStackTrace();
+        }
+
 
         deviceWidth=getScreenWidth();
         deviceHeight=getScreenHeight();
     }
 
     /**
-     * Called when our {@code Activity} gains focus. <p>Starts initializing the camera.</p>
+     * Called when our Activity gains focus. Starts initializing the camera.
+     * Initializes ASUforia object and sets up the reference image.
      */
     @Override
     protected void onResume() {
         super.onResume();
 
-//        mBackgroundThread = new HandlerThread("background");
-//        mBackgroundThread.start();
-//        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
-//        mForegroundHandler = new Handler(getMainLooper());
-
-//        mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
 //        // Inflate the SurfaceView, set it as the main layout, and attach a listener
         setContentView(R.layout.activity_main);
         mSurfaceView = (SurfaceView) findViewById(R.id.mainSurfaceView);
         transparentView = (SurfaceView) findViewById(R.id.TransparetnView);
 //        mSurfaceView.getHolder().addCallback((SurfaceHolder.Callback) this);
         mActivity = this;
-        myforia = new ASUforia();
+        myforia = new ASUforia(ref_img,mSurfaceView);
         Context context = getApplicationContext();
-        myforia.startEstimation(mSurfaceView,context,transparentView, mActivity);
+        myforia.startEstimation(context,transparentView, mActivity);
+        myforia.onPose();
         System.out.println("After ASUforia");
-//        holderTransparent = transparentView.getHolder();
-//        holderTransparent.setFormat(PixelFormat.TRANSPARENT);
-//        holderTransparent.addCallback((SurfaceHolder.Callback) this);
-//        transparentView.setZOrderMediaOverlay(true);
 
-        // Start a background thread to manage camera requests
-//        mBackgroundThread = new HandlerThread("background");
-//        mBackgroundThread.start();
-//        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
-//        mForegroundHandler = new Handler(getMainLooper());
-//        mCameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
-//        // Inflate the SurfaceView, set it as the main layout, and attach a listener
-//        View layout = getLayoutInflater().inflate(R.layout.activity_main, null);
-//        mSurfaceView = (SurfaceView) layout.findViewById(R.id.mainSurfaceView);
-//        mSurfaceView.getHolder().addCallback(mSurfaceHolderCallback);
-//        setContentView(mSurfaceView);
-//        // Control flow continues in mSurfaceHolderCallback.surfaceChanged()
     }
 
-//    private void getFrame() {
-//        System.out.println("Starting thread");
-//        Thread thread = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//
-//                runOnUiThread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        System.out.println("Running thread");
-//                        frame_refresh( holder,  deviceWidth,  deviceHeight);
-//                    }
-//                });
-//            }
-//        });
-//
-//        thread.start();
-//        System.out.println("Done creating thread");
-//    }
-//    @Override
-//    public void surfaceCreated( SurfaceHolder holder) {
-//        Log.i(TAG, "------------------Surface created----------------");
-//        System.out.println("1. Surface created");
-//        mCameraId = null;
-//        mGotSecondCallback = false;
-////        Thread thread = new Thread(runnable);
-////        thread.run();
-//        getFrame();
-//        Draw();
-//        System.out.println("2. Surface created");
-//    }
-//
-//    @Override
-//    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-//        //frame_refresh( holder,  width,  height);
-//        //System.out.println("%%%%%%%%%%%%       Running in surface change");
-//    }
-
-//    private void frame_refresh(SurfaceHolder holder, int width, int height) {
-//        // On the first invocation, width and height were automatically set to the view's size
-//        if (mCameraId == null) {
-//            // Find the device's back-facing camera and set the destination buffer sizes
-//            try {
-//                for (String cameraId : mCameraManager.getCameraIdList()) {
-//                    CameraCharacteristics cameraCharacteristics =
-//                            mCameraManager.getCameraCharacteristics(cameraId);
-//                    if (cameraCharacteristics.get(cameraCharacteristics.LENS_FACING) ==
-//                            CameraCharacteristics.LENS_FACING_BACK) {
-//                        Log.i(TAG, "Found a back-facing camera");
-//                        StreamConfigurationMap info = cameraCharacteristics
-//                                .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-//                        // Bigger is better when it comes to saving our image
-//                        Size largestSize = Collections.max(
-//                                Arrays.asList(info.getOutputSizes(ImageFormat.JPEG)),
-//                                new CompareSizesByArea());
-//                        // Prepare an ImageReader in case the user wants to capture images
-//                        Log.i(TAG, "Capture size: " + largestSize);
-//                        mCaptureBuffer = ImageReader.newInstance(largestSize.getWidth(),
-//                                largestSize.getHeight(), ImageFormat.JPEG, /*maxImages*/2);
-//                        imgSurface = mCaptureBuffer.getSurface();
-//
-//                        mCaptureBuffer.setOnImageAvailableListener(
-//                                mImageCaptureListener, mBackgroundHandler);
-//                        // Danger, W.R.! Attempting to use too large a preview size could
-//                        // exceed the camera bus' bandwidth limitation, resulting in
-//                        // gorgeous previews but the storage of garbage capture data.
-//                        Log.i(TAG, "SurfaceView size: " +
-//                                mSurfaceView.getWidth() + 'x' + mSurfaceView.getHeight());
-//                        Size optimalSize = chooseBigEnoughSize(
-//                                info.getOutputSizes(SurfaceHolder.class), width, height);
-//                        // Set the SurfaceHolder to use the camera's largest supported size
-//                        Log.i(TAG, "Preview size: " + optimalSize);
-//                        SurfaceHolder surfaceHolder = mSurfaceView.getHolder();
-//                        surfaceHolder.setFixedSize(optimalSize.getWidth(),
-//                                optimalSize.getHeight());
-//                        mCameraId = cameraId;
-//                        return;
-//                        // Control flow continues with this method one more time
-//                        // (since we just changed our own size)
-//                    }
-//                }
-//            } catch (CameraAccessException ex) {
-//                Log.e(TAG, "Unable to list cameras", ex);
-//            }
-//            Log.e(TAG, "Didn't find any back-facing cameras");
-//            // This is the second time the method is being invoked: our size change is complete
-//        }
-//    }
-
-//    @Override
-//    public void surfaceDestroyed(SurfaceHolder holder) {
-//        Log.i(TAG, "Surface destroyed");
-//        holder.removeCallback(this);
-//    }
 
     /**
-     * Compares two {@code Size}s based on their areas.
+     * Compares two sizes based on their areas.
      */
     static class CompareSizesByArea implements Comparator<Size> {
         @Override
@@ -339,7 +213,7 @@ public class MainActivity extends AppCompatActivity{
         }
     }
 
-
+    // Gives screen width
     public static int getScreenWidth() {
 
         return Resources.getSystem().getDisplayMetrics().widthPixels;
@@ -347,370 +221,30 @@ public class MainActivity extends AppCompatActivity{
     }
 
 
-
+    // Gives screen height
     public static int getScreenHeight() {
 
         return Resources.getSystem().getDisplayMetrics().heightPixels;
 
     }
 
-//    private void Draw()
-//
-//    {
-//
-//        Canvas canvas = holderTransparent.lockCanvas(null);
-//
-//        Paint  paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-//
-//        paint.setStyle(Paint.Style.STROKE);
-//
-//        paint.setColor(Color.GREEN);
-//
-//        paint.setStrokeWidth(3);
-//
-//        RectLeft = 1;
-//
-//        RectTop = 200 ;
-//
-//        RectRight = RectLeft+ deviceWidth-100;
-//
-//        RectBottom =RectTop+ 200;
-//
-//        Rect rec=new Rect((int) RectLeft,(int)RectTop,(int)RectRight,(int)RectBottom);
-//
-//        canvas.drawRect(rec,paint);
-//
-//        holderTransparent.unlockCanvasAndPost(canvas);
-//
-//
-//
-//    }
-
-
 
     /**
-     * Called when our {@code Activity} loses focus. <p>Tears everything back down.</p>
+     * Called when our Activity loses focus.Tears everything back down.
      */
     @Override
     protected void onPause() {
         super.onPause();
 
         myforia.endEstimation();
-//        try {
-//            // Ensure SurfaceHolderCallback#surfaceChanged() will run again if the user returns
-//            mSurfaceView.getHolder().setFixedSize(/*width*/0, /*height*/0);
-//            // Cancel any stale preview jobs
-//            if (mCaptureSession != null) {
-//                mCaptureSession.close();
-//                mCaptureSession = null;
-//            }
-//        } finally {
-//            if (mCamera != null) {
-//                mCamera.close();
-//                mCamera = null;
-//            }
-//        }
-        // Finish processing posted messages, then join on the handling thread
-//        mBackgroundThread.quitSafely();
-//        try {
-//            mBackgroundThread.join();
-//        } catch (InterruptedException ex) {
-//            Log.e(TAG, "Background worker thread was interrupted while joined", ex);
-//        }
-//        // Close the ImageReader now that the background thread has stopped
-//        if (mCaptureBuffer != null) mCaptureBuffer.close();
+
 
     }
+    // Implementeation of onPose callback
+    @Override
+    public void callbackonPose() {
 
-    /**
-     * Called when the user clicks on our {@code SurfaceView}, which has ID {@code mainSurfaceView}
-     * as defined in the {@code mainactivity.xml} layout file. <p>Captures a full-resolution image
-     * and saves it to permanent storage.</p>
-     */
-//    public void onClickOnSurfaceView(View v) {
-//        if (mCaptureSession != null) {
-//            try {
-//                CaptureRequest.Builder requester =
-//                        mCamera.createCaptureRequest(mCamera.TEMPLATE_STILL_CAPTURE);
-//                requester.addTarget(mCaptureBuffer.getSurface());
-//                try {
-//                    // This handler can be null because we aren't actually attaching any callback
-//                    mCaptureSession.capture(requester.build(), /*listener*/null, /*handler*/null);
-//                } catch (CameraAccessException ex) {
-//                    Log.e(TAG, "Failed to file actual capture request", ex);
-//                }
-//            } catch (CameraAccessException ex) {
-//                Log.e(TAG, "Failed to build actual capture request", ex);
-//            }
-//        } else {
-//            Log.e(TAG, "User attempted to perform a capture outside our session");
-//        }
-//        // Control flow continues in mImageCaptureListener.onImageAvailable()
-//    }
-
-    /**
-     * Callbacks invoked upon state changes in our {@code SurfaceView}.
-     */
-//    final SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
-//        /** The camera device to use, or null if we haven't yet set a fixed surface size. */
-//        private String mCameraId;
-//        /** Whether we received a change callback after setting our fixed surface size. */
-//        private boolean mGotSecondCallback;
-
-//        SurfaceHolder holderTransparent;
-//
-//        private float RectLeft, RectTop,RectRight,RectBottom ;
-//
-//        int  deviceHeight,deviceWidth;
-
-//        @Override
-//        public void surfaceCreated(SurfaceHolder holder) {
-//            // This is called every time the surface returns to the foreground
-////            Log.i(TAG, "Surface created");
-////            mCameraId = null;
-////            mGotSecondCallback = false;
-////            Draw();
-//
-////            drawView.setBackgroundColor(Color.WHITE);
-//            //setContentView(drawView);
-//        }
-
-//        @Override
-//        public void surfaceDestroyed(SurfaceHolder holder) {
-//            Log.i(TAG, "Surface destroyed");
-//            holder.removeCallback(this);
-//            // We don't stop receiving callbacks forever because onResume() will reattach us
-//        }
-
-//        @Override
-//        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-//            // On the first invocation, width and height were automatically set to the view's size
-//            if (mCameraId == null) {
-//                // Find the device's back-facing camera and set the destination buffer sizes
-//                try {
-//                    for (String cameraId : mCameraManager.getCameraIdList()) {
-//                        CameraCharacteristics cameraCharacteristics =
-//                                mCameraManager.getCameraCharacteristics(cameraId);
-//                        if (cameraCharacteristics.get(cameraCharacteristics.LENS_FACING) ==
-//                                CameraCharacteristics.LENS_FACING_BACK) {
-//                            Log.i(TAG, "Found a back-facing camera");
-//                            StreamConfigurationMap info = cameraCharacteristics
-//                                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-//                            // Bigger is better when it comes to saving our image
-//                            Size largestSize = Collections.max(
-//                                    Arrays.asList(info.getOutputSizes(ImageFormat.JPEG)),
-//                                    new CompareSizesByArea());
-//                            // Prepare an ImageReader in case the user wants to capture images
-//                            Log.i(TAG, "Capture size: " + largestSize);
-//                            mCaptureBuffer = ImageReader.newInstance(largestSize.getWidth(),
-//                                    largestSize.getHeight(), ImageFormat.JPEG, /*maxImages*/2);
-//                            mCaptureBuffer.setOnImageAvailableListener(
-//                                    mImageCaptureListener, mBackgroundHandler);
-//                            // Danger, W.R.! Attempting to use too large a preview size could
-//                            // exceed the camera bus' bandwidth limitation, resulting in
-//                            // gorgeous previews but the storage of garbage capture data.
-//                            Log.i(TAG, "SurfaceView size: " +
-//                                    mSurfaceView.getWidth() + 'x' + mSurfaceView.getHeight());
-//                            Size optimalSize = chooseBigEnoughSize(
-//                                    info.getOutputSizes(SurfaceHolder.class), width, height);
-//                            // Set the SurfaceHolder to use the camera's largest supported size
-//                            Log.i(TAG, "Preview size: " + optimalSize);
-//                            SurfaceHolder surfaceHolder = mSurfaceView.getHolder();
-//                            surfaceHolder.setFixedSize(optimalSize.getWidth(),
-//                                    optimalSize.getHeight());
-//                            mCameraId = cameraId;
-//                            return;
-//                            // Control flow continues with this method one more time
-//                            // (since we just changed our own size)
-//                        }
-//                    }
-//                } catch (CameraAccessException ex) {
-//                    Log.e(TAG, "Unable to list cameras", ex);
-//                }
-//                Log.e(TAG, "Didn't find any back-facing cameras");
-//                // This is the second time the method is being invoked: our size change is complete
-//            } else if (!mGotSecondCallback) {
-//                if (mCamera != null) {
-//                    Log.e(TAG, "Aborting camera open because it hadn't been closed");
-//                    return;
-//                }
-//                // Open the camera device
-//                try {
-//                    if(ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getBaseContext(),Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
-//                    {
-//                        ActivityCompat.requestPermissions(mainactivty, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
-//                        return;
-//                    }
-//                    mCameraManager.openCamera(mCameraId, mCameraStateCallback,
-//                            mBackgroundHandler);
-//                } catch (CameraAccessException ex) {
-//                    Log.e(TAG, "Failed to configure output surface", ex);
-//                }
-//                mGotSecondCallback = true;
-//                // Control flow continues in mCameraStateCallback.onOpened()
-//            }
-//        }};
-//    /**
-//     * Calledbacks invoked upon state changes in our {@code CameraDevice}. <p>These are run on
-//     * {@code mBackgroundThread}.</p>
-//     */
-//    final CameraDevice.StateCallback mCameraStateCallback =
-//            new CameraDevice.StateCallback() {
-//                @Override
-//                public void onOpened(CameraDevice camera) {
-//                    Log.i(TAG, "Successfully opened camera");
-//                    mCamera = camera;
-//                    try {
-//                        List<Surface> outputs = Arrays.asList(
-//                                mSurfaceView.getHolder().getSurface(), mCaptureBuffer.getSurface());
-//                        camera.createCaptureSession(outputs, mCaptureSessionListener,
-//                                mBackgroundHandler);
-//                    } catch (CameraAccessException ex) {
-//                        Log.e(TAG, "Failed to create a capture session", ex);
-//                    }
-//                    // Control flow continues in mCaptureSessionListener.onConfigured()
-//                }
-//                @Override
-//                public void onDisconnected(CameraDevice camera) {
-//                    Log.e(TAG, "Camera was disconnected");
-//                }
-//                @Override
-//                public void onError(CameraDevice camera, int error) {
-//                    Log.e(TAG, "State error on device '" + camera.getId() + "': code " + error);
-//                }
-//    };
-    /**
-     * Callbacks invoked upon state changes in our {@code CameraCaptureSession}. <p>These are run on
-     * {@code mBackgroundThread}.</p>
-     */
-//    final CameraCaptureSession.StateCallback mCaptureSessionListener =
-//            new CameraCaptureSession.StateCallback() {
-//                @Override
-//                public void onConfigured(CameraCaptureSession session) {
-//                    Log.i(TAG, "Finished configuring camera outputs");
-//                    mCaptureSession = session;
-//                    SurfaceHolder holder = mSurfaceView.getHolder();
-//                    if (holder != null) {
-//                        try {
-//                            // Build a request for preview footage
-//                            CaptureRequest.Builder requestBuilder =
-//                                    mCamera.createCaptureRequest(mCamera.TEMPLATE_PREVIEW);
-//                            requestBuilder.addTarget(holder.getSurface());
-//                            CaptureRequest previewRequest = requestBuilder.build();
-//                            // Start displaying preview images
-//                            try {
-//                                session.setRepeatingRequest(previewRequest, /*listener*/null,
-//                                /*handler*/null);
-//                            } catch (CameraAccessException ex) {
-//                                Log.e(TAG, "Failed to make repeating preview request", ex);
-//                            }
-//                        } catch (CameraAccessException ex) {
-//                            Log.e(TAG, "Failed to build preview request", ex);
-//                        }
-//                    }
-//                    else {
-//                        Log.e(TAG, "Holder didn't exist when trying to formulate preview request");
-//                    }
-//                }
-//                @Override
-//                public void onClosed(CameraCaptureSession session) {
-//                    mCaptureSession = null;
-//                }
-//                @Override
-//                public void onConfigureFailed(CameraCaptureSession session) {
-//                    Log.e(TAG, "Configuration error on device '" + mCamera.getId());
-//                }};
-    /**
-     * Callback invoked when we've received a JPEG image from the camera.
-     */
-//    final ImageReader.OnImageAvailableListener mImageCaptureListener =
-//            new ImageReader.OnImageAvailableListener() {
-//                @Override
-//                public void onImageAvailable(ImageReader reader) {
-//                    // Save the image once we get a chance
-//                    //mBackgroundHandler.post(new CapturedImageSaver(reader.acquireNextImage()));
-//                    // Control flow continues in CapturedImageSaver#run()
-//                    Image capture = reader.acquireNextImage();
-//                    System.out.println("**************** Captured Image ***************************");
-//                    Mat yuvMat = new Mat(capture.getHeight() + capture.getHeight() / 2, capture.getWidth(), CV_8UC1);
-//                    Mat rgbMat = new Mat(capture.getHeight(), capture.getHeight(), CvType.CV_8UC3);
-//
-//                    ByteBuffer Y = capture.getPlanes()[0].getBuffer();
-//                    ByteBuffer U = capture.getPlanes()[1].getBuffer();
-//                    ByteBuffer V = capture.getPlanes()[2].getBuffer();
-//
-//                    int Yb = Y.remaining();
-//                    int Ub = U.remaining();
-//                    int Vb = V.remaining();
-//                    System.out.println("Captured image size: " + capture.getWidth() + 'x' + capture.getHeight());
-//                    // Write the image out to the chosen file
-////                    byte[] jpeg = new byte[buffer.remaining()];
-////                    buffer.get(jpeg);
-////                    ostream.write(jpeg);
-//                    byte[] data = new byte[Yb + Ub + Vb ];
-//
-//                    Y.get(data, 0, Yb);
-//                    U.get(data, Yb, Ub);
-//                    V.get(data, Yb+ Ub, Vb);
-//
-//                    System.out.println("RGB Mat data before"+rgbMat);
-//                    System.out.println("YUV Mat data before"+yuvMat);
-//                    yuvMat.put(0, 0, data);
-//                    System.out.println("sssssssssssssssssssssssssssssss");
-//                    Imgproc.cvtColor(yuvMat, rgbMat, Imgproc.COLOR_YUV420p2RGBA, 3);
-//
-//                    yuvMat.release();
-////                    mat1 = Imgcodecs.imdecode(new MatOfByte(data), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
-////                    String dump = rgbMat.dump();
-//                    Log.i(TAG,"-------------------------------------------");
-//                    System.out.println("RGB Mat data after"+rgbMat);
-//                    System.out.println("YUV Mat data after"+yuvMat);
-//                    //                    System.out.println(rgbMat);
-////                    Log.d(TAG, dump);
-//                    Log.i(TAG,"-------------------------------------------");
-////                    rgbMat.release();
-////                    foriatry = new ASUforia(rgbMat);
-//
-////                    foriatry.startImageProcesing(ivBlurImage1);
-////
-//                }};
-    /**
-     * Deferred processor responsible for saving snapshots to disk. <p>This is run on
-     * {@code mBackgroundThread}.</p>
-     */
-    static class CapturedImageSaver implements Runnable {
-        /** The image to save. */
-        private Image mCapture;
-        public CapturedImageSaver(Image capture) {
-            mCapture = capture;
-        }
-        @Override
-        public void run() {
-            try {
-                // Choose an unused filename under the Pictures/ directory
-                File file = File.createTempFile(CAPTURE_FILENAME_PREFIX, ".jpg",
-                        Environment.getExternalStoragePublicDirectory(
-                                Environment.DIRECTORY_PICTURES));
-                try (FileOutputStream ostream = new FileOutputStream(file)) {
-                    Log.i(TAG, "Retrieved image is" +
-                            (mCapture.getFormat() == ImageFormat.JPEG ? "" : "n't") + " a JPEG");
-                    ByteBuffer buffer = mCapture.getPlanes()[0].getBuffer();
-                    Log.i(TAG, "Captured image size: " +
-                            mCapture.getWidth() + 'x' + mCapture.getHeight());
-                    // Write the image out to the chosen file
-                    byte[] jpeg = new byte[buffer.remaining()];
-                    buffer.get(jpeg);
-                    ostream.write(jpeg);
-                } catch (FileNotFoundException ex) {
-                    Log.e(TAG, "Unable to open output file for writing", ex);
-                } catch (IOException ex) {
-                    Log.e(TAG, "Failed to write the image to the output file", ex);
-                }
-            } catch (IOException ex) {
-                Log.e(TAG, "Unable to create a new output file", ex);
-            } finally {
-                mCapture.close();
-            }
-        }
+        Log.d(null,"callback successful");
     }
+
 }
